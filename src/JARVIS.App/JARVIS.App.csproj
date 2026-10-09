@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <RootNamespace>Jarvis.App</RootNamespace>
+    <AssemblyName>JARVIS</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\jarvis.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>JARVIS Desktop Operator</Product>
+    <Description>Локальный голосовой оператор рабочего стола Windows без нейросетей</Description>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\jarvis.ico" />
+    <!-- Нативная библиотека распознавания собирается в CI (scripts/build-pocketsphinx.ps1) -->
+    <None Include="..\..\native\win-x64\pocketsphinx.dll" Condition="Exists('..\..\native\win-x64\pocketsphinx.dll')">
+      <Link>pocketsphinx.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <!-- Иконка хранится в репозитории как Base64 (Assets/jarvis.ico.b64), бинарный .ico создаётся перед сборкой -->
+  <UsingTask TaskName="JarvisDecodeBase64" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Source ParameterType="System.String" Required="true" />
+      <Target ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var text = System.IO.File.ReadAllText(Source).Replace("\r", "").Replace("\n", "").Trim();
+        var bytes = System.Convert.FromBase64String(text);
+        if (!System.IO.File.Exists(Target) || System.IO.File.ReadAllBytes(Target).Length != bytes.Length)
+            System.IO.File.WriteAllBytes(Target, bytes);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="JarvisMaterializeIcon" BeforeTargets="PrepareForBuild;CollectPackageReferences" Condition="Exists('Assets\jarvis.ico.b64')">
+    <JarvisDecodeBase64 Source="$(MSBuildProjectDirectory)\Assets\jarvis.ico.b64" Target="$(MSBuildProjectDirectory)\Assets\jarvis.ico" />
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="..\JARVIS.Core\JARVIS.Core.csproj" />
+    <ProjectReference Include="..\JARVIS.Templates\JARVIS.Templates.csproj" />
+    <ProjectReference Include="..\JARVIS.Automation\JARVIS.Automation.csproj" />
+    <ProjectReference Include="..\JARVIS.Voice\JARVIS.Voice.csproj" />
+    <ProjectReference Include="..\JARVIS.Windows\JARVIS.Windows.csproj" />
+    <ProjectReference Include="..\JARVIS.Vision\JARVIS.Vision.csproj" />
+  </ItemGroup>
+</Project>

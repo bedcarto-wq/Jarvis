@@ -1,0 +1,115 @@
+name: build
+
+on:
+  push:
+    branches: [ main, "feature/**" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Окружение
+        run: |
+          dotnet --info
+          cmake --version
+          [System.Environment]::OSVersion
+
+      - name: Сборка PocketSphinx (нативная DLL)
+        run: ./scripts/build-pocketsphinx.ps1
+
+      - name: Кэш моделей
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/jarvis-data
+          key: jarvis-models-ru52-tess-v1
+
+      - name: Загрузка моделей (для интеграционных тестов и самопроверки)
+        continue-on-error: true
+        run: ./scripts/download-models.ps1 -Root "${{ runner.temp }}/jarvis-data"
+
+      - name: Restore
+        run: dotnet restore JARVIS.sln
+
+      - name: Build (Release)
+        run: dotnet build JARVIS.sln -c Release --no-restore -bl:artifacts/logs/build.binlog
+
+      - name: Tests (Release, включая PocketSphinx на Windows)
+        run: |
+          $env:JARVIS_POCKETSPHINX_LIB = (Resolve-Path native/win-x64/pocketsphinx.dll).Path
+          $model = "${{ runner.temp }}/jarvis-data/models/cmusphinx-ru-5.2"
+          if (Test-Path $model) { $env:JARVIS_PS_MODEL = $model } else { Write-Warning "Модель не загружена: интеграционный тест декодера будет пропущен" }
+          dotnet test JARVIS.sln -c Release --no-build --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory artifacts/test-results
+
+      - name: Publish (self-contained win-x64)
+        run: dotnet publish src/JARVIS.App/JARVIS.App.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish/JARVIS -bl:artifacts/logs/publish.binlog
+
+      - name: Сборка пакета
+        run: |
+          $pkg = "artifacts/publish/JARVIS"
+          if (-not (Test-Path "$pkg/JARVIS.exe")) { throw "JARVIS.exe отсутствует" }
+          if (-not (Test-Path "$pkg/pocketsphinx.dll")) { throw "pocketsphinx.dll отсутствует в публикации" }
+          New-Item -ItemType Directory -Force "$pkg/scripts", "$pkg/docs" | Out-Null
+          Copy-Item scripts/download-models.ps1, scripts/install-models.cmd "$pkg/scripts/"
+          Copy-Item docs/*.md "$pkg/docs/"
+          Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md $pkg
+          Compress-Archive -Path "$pkg/*" -DestinationPath artifacts/JARVIS-Windows-x64.zip -Force
+          Get-Item artifacts/JARVIS-Windows-x64.zip | Format-List Name, Length
+
+      - name: Самопроверка собранного JARVIS.exe на Windows
+        run: |
+          $data = "${{ runner.temp }}/jarvis-data"
+          $a = @("--selftest", "--desktop", "--benchmark", "--report", "$PWD/artifacts/selftest-report.txt")
+          if (Test-Path "$data/models/cmusphinx-ru-5.2") { $a += @("--model", "$data/models/cmusphinx-ru-5.2") }
+          if (Test-Path "$data/tessdata/rus.traineddata") { $a += @("--tessdata", "$data/tessdata") }
+          $p = Start-Process -FilePath artifacts/publish/JARVIS/JARVIS.exe -ArgumentList $a -PassThru -Wait
+          Get-Content artifacts/selftest-report.txt
+          if ($p.ExitCode -ne 0) { throw "Самопроверка завершилась с кодом $($p.ExitCode)" }
+
+      - name: Артефакт JARVIS-Windows-x64.zip
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Windows-x64
+          path: artifacts/JARVIS-Windows-x64.zip
+          if-no-files-found: warn
+
+      - name: Отчёты тестов и самопроверки
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            artifacts/test-results/**
+            artifacts/selftest-report.txt
+          if-no-files-found: ignore
+
+      - name: Диагностика при ошибке
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics
+          path: |
+            artifacts/logs/**
+            artifacts/pocketsphinx-src/pocketsphinx-*/build-win-x64/CMakeFiles/*.log
+            **/obj/**/*.AssemblyInfo.cs
+          if-no-files-found: ignore

@@ -1,0 +1,39 @@
+<Window x:Class="Jarvis.App.Views.HudWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JARVIS HUD" Width="330" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Focusable="False">
+  <Border x:Name="Frame" CornerRadius="14" Padding="12" BorderThickness="1.5" BorderBrush="{StaticResource Accent}">
+    <Border.Background>
+      <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#EE0A101E" Offset="0" />
+        <GradientStop Color="#EE10233F" Offset="1" />
+      </LinearGradientBrush>
+    </Border.Background>
+    <Border.Effect>
+      <DropShadowEffect x:Name="Glow" Color="#22D3EE" BlurRadius="18" ShadowDepth="0" Opacity="0.7" />
+    </Border.Effect>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="56" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid Width="48" Height="48" VerticalAlignment="Top">
+        <Ellipse x:Name="OuterRing" Stroke="{StaticResource Accent}" StrokeThickness="3" />
+        <Ellipse x:Name="MidRing" Margin="8" Stroke="{StaticResource Gold}" StrokeThickness="2" />
+        <Ellipse x:Name="Core" Margin="16" Fill="{StaticResource Accent}" />
+      </Grid>
+      <StackPanel Grid.Column="1" Margin="6,0,0,0">
+        <TextBlock x:Name="StateText" Text="Ожидание" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Accent}" />
+        <TextBlock x:Name="LineText" Text="Скажите «Джарвис»" FontSize="13" Foreground="{StaticResource Fg}" TextTrimming="CharacterEllipsis" MaxHeight="58" />
+        <TextBlock x:Name="StepTextBlock" FontSize="11" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
+        <Grid Margin="0,6,0,0" Height="6">
+          <Border CornerRadius="3" Background="#3324406A" />
+          <Border x:Name="MicBar" CornerRadius="3" Background="{StaticResource Ok}" HorizontalAlignment="Left" Width="0" />
+        </Grid>
+        <TextBlock x:Name="MicText" FontSize="10" Foreground="{StaticResource Muted}" Text="Микрофон" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

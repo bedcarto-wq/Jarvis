@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Jarvis.Automation</RootNamespace>
+    <AssemblyName>JARVIS.Automation</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\JARVIS.Core\JARVIS.Core.csproj" />
+    <ProjectReference Include="..\JARVIS.Templates\JARVIS.Templates.csproj" />
+    <InternalsVisibleTo Include="JARVIS.Tests" />
+  </ItemGroup>
+</Project>
