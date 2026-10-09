@@ -1,0 +1,45 @@
+<Window x:Class="Jarvis.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JARVIS — локальный оператор рабочего стола" Width="1180" Height="780" MinWidth="900" MinHeight="600"
+        Background="{StaticResource Bg}" WindowStartupLocation="CenterScreen" Icon="/Assets/jarvis.ico">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="230" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="18,20,18,14">
+          <TextBlock Text="J.A.R.V.I.S." FontSize="26" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+          <TextBlock Text="локальный оператор" Foreground="{StaticResource Gold}" FontSize="12" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Ellipse x:Name="StateDot" Width="10" Height="10" Fill="{StaticResource Accent}" Margin="0,0,8,0" />
+            <TextBlock x:Name="StateLabel" Text="Ожидание" Foreground="{StaticResource Fg}" />
+          </StackPanel>
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Bottom" Margin="18,8,18,14" Style="{StaticResource Hint}"
+                   Text="Без нейросетей и облака. Данные — только на этом компьютере." />
+        <ListBox x:Name="Nav" Background="Transparent" BorderThickness="0" Margin="8,0" SelectionChanged="Nav_SelectionChanged">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="Padding" Value="12,9" />
+              <Setter Property="Foreground" Value="{StaticResource Fg}" />
+              <Setter Property="FontSize" Value="14" />
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBoxItem Content="🏠  Главная" Tag="home" />
+          <ListBoxItem Content="🧩  Редактор шаблонов" Tag="editor" />
+          <ListBoxItem Content="📚  Библиотека" Tag="library" />
+          <ListBoxItem Content="🗂  Приложения" Tag="apps" />
+          <ListBoxItem Content="📌  Запомненные элементы" Tag="anchors" />
+          <ListBoxItem Content="🎙  Голос" Tag="voice" />
+          <ListBoxItem Content="🛡  Безопасность" Tag="security" />
+          <ListBoxItem Content="⚡  Производительность" Tag="performance" />
+          <ListBoxItem Content="ℹ  О программе" Tag="about" />
+        </ListBox>
+      </DockPanel>
+    </Border>
+    <ContentControl x:Name="Host" Grid.Column="1" Margin="24,20,24,16" />
+  </Grid>
+</Window>

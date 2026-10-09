@@ -1,0 +1,11 @@
+bin/
+obj/
+publish/
+artifacts/
+native/
+TestResults/
+*.user
+*.suo
+.vs/
+*.binlog
+src/JARVIS.App/Assets/jarvis.ico
