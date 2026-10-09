@@ -52,6 +52,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         {
             list.Add(Measurement.Unavailable(MKeys.VoiceModel, g, "Русская акустическая модель", problem));
             list.Add(Measurement.Unavailable(MKeys.VoiceRtf, g, "Скорость распознавания", "Модель не установлена"));
+            list.Add(Measurement.Unavailable(MKeys.VoiceAccuracy, g, "Точность на тестовых записях", "Модель не установлена"));
             return list;
         }
         list.Add(new(MKeys.VoiceModel, g, "Русская акустическая модель", 1, "", "cmusphinx-ru-5.2 (GMM-HMM, не нейросеть)", problem));
@@ -71,6 +72,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         {
             list.Add(Measurement.Unavailable(MKeys.VoiceInitMs, g, "Инициализация распознавателя", ex.Message));
             list.Add(Measurement.Unavailable(MKeys.VoiceRtf, g, "Скорость распознавания", "Распознаватель не запустился"));
+            list.Add(Measurement.Unavailable(MKeys.VoiceAccuracy, g, "Точность на тестовых записях", "Распознаватель не запустился"));
             return list;
         }
         list.Add(new(MKeys.VoiceInitMs, g, "Инициализация распознавателя", sw.Elapsed.TotalMilliseconds, "мс",
