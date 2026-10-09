@@ -453,12 +453,21 @@ public class PerformanceTests : IDisposable
         return Path.Combine(d?.FullName ?? throw new DirectoryNotFoundException(name), name);
     }
 
+    /// <summary>Недоступное место: несуществующий диск в Windows, /proc в Linux.</summary>
+    private static string MissingDir()
+    {
+        if (!OperatingSystem.IsWindows()) return "/proc/jarvis-нельзя-писать";
+        var used = DriveInfo.GetDrives().Select(d => char.ToUpperInvariant(d.Name[0])).ToHashSet();
+        var free = "QRSTUVWXYZJKLMNOP".First(c => !used.Contains(c));
+        return $@"{free}:\нет-такого-диска\JARVIS";
+    }
+
     // 16. HDD / дополнительное хранилище.
     [Fact]
     public void ExtraStorage_Unavailable_FallsBackToLocal_WithMessage()
     {
         var local = Path.Combine(_root, "exports");
-        var missing = OperatingSystem.IsWindows() ? @"Q:\нет-такого-диска\JARVIS" : "/proc/jarvis-нельзя-писать";
+        var missing = MissingDir();
         var r = StorageLocations.Resolve(missing, "exports", local);
         Assert.True(r.UsedFallback);
         Assert.Equal(local, r.Path);
@@ -474,7 +483,7 @@ public class PerformanceTests : IDisposable
     public async Task StorageProbe_MeasuresDisk_AndMarksMissingExtraAsUnavailable()
     {
         Directory.CreateDirectory(_root);
-        var probe = new StorageProbe(_root, () => "/proc/jarvis-нельзя-писать");
+        var probe = new StorageProbe(_root, MissingDir);
         var m = await probe.RunAsync(new BenchmarkContext { Request = new(BenchmarkTrigger.Button), CurrentParameters = new Dictionary<string, double>() }, CancellationToken.None);
         Assert.True(m.Single(x => x.Key == MKeys.DiskWriteMs).Value > 0);
         Assert.False(m.Single(x => x.Key == MKeys.DiskExtra).Value is > 0);

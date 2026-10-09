@@ -60,6 +60,18 @@ jobs:
           if (Test-Path $model) { $env:JARVIS_PS_MODEL = $model } else { Write-Warning "Модель не загружена: интеграционный тест декодера будет пропущен" }
           dotnet test JARVIS.sln -c Release --no-build --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory artifacts/test-results
 
+      - name: Упавшие тесты (аннотации)
+        if: failure()
+        run: |
+          Get-ChildItem artifacts/test-results -Recurse -Filter *.trx | ForEach-Object {
+            [xml]$x = Get-Content $_.FullName
+            $x.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq "Failed" } | ForEach-Object {
+              $msg = ($_.Output.ErrorInfo.Message + " | " + ($_.Output.ErrorInfo.StackTrace -split "`n" | Select-Object -First 3) -join " ") -replace "`r?`n", " "
+              if ($msg.Length -gt 900) { $msg = $msg.Substring(0, 900) }
+              Write-Output "::error title=$($_.testName)::$msg"
+            }
+          }
+
       - name: Publish (self-contained win-x64)
         run: dotnet publish src/JARVIS.App/JARVIS.App.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish/JARVIS -bl:artifacts/logs/publish.binlog
 
