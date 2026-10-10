@@ -26,11 +26,13 @@ public sealed class VoicePage : UserControl, IPage
             v => { U(x => x.MicrophoneDeviceNumber = v); });
         var engine = K.Combo(new (SpeechEngineKind, string)[]
         {
-            (SpeechEngineKind.Vosk, "Vosk small-ru (рекомендуется, офлайн, лёгкая нейросеть ~45 МБ)"),
+            (SpeechEngineKind.GigaAm, "GigaAM v3 от Сбера (рекомендуется, офлайн, лучшая точность, ~225 МБ)"),
+            (SpeechEngineKind.Vosk, "Vosk small-ru (офлайн, лёгкая модель ~45 МБ, только команды)"),
             (SpeechEngineKind.PocketSphinx, "CMU PocketSphinx (офлайн, без нейросетей, низкая точность)"),
             (SpeechEngineKind.WindowsSapi, "Распознаватель Windows SAPI (нужен русский распознаватель Windows)"),
             (SpeechEngineKind.None, "Выключено (только текстовые команды)"),
         }, s.SpeechEngine, v => { U(x => x.SpeechEngine = v); UpdateModelStatus(); }, 460);
+        var gigaModel = K.Box(s.GigaAmModelPath ?? "", v => { U(x => x.GigaAmModelPath = string.IsNullOrWhiteSpace(v) ? null : v.Trim()); UpdateModelStatus(); });
         var voskModel = K.Box(s.VoskModelPath ?? "", v => { U(x => x.VoskModelPath = string.IsNullOrWhiteSpace(v) ? null : v.Trim()); UpdateModelStatus(); });
         var model = K.Box(s.PocketSphinxModelPath ?? "", v => { U(x => x.PocketSphinxModelPath = string.IsNullOrWhiteSpace(v) ? null : v.Trim()); UpdateModelStatus(); });
         var wake = K.Box(string.Join(Environment.NewLine, s.WakePhrases), v => U(x => x.WakePhrases =
@@ -52,6 +54,7 @@ public sealed class VoicePage : UserControl, IPage
             K.H1("Голос"),
             K.Card(K.H2("Распознавание речи"),
                 K.Labeled("Движок", engine),
+                K.Labeled($"Папка модели GigaAM (пусто = %LOCALAPPDATA%\\JARVIS\\models\\{GigaAmEngine.DefaultModelName})", gigaModel),
                 K.Labeled($"Папка модели Vosk (пусто = %LOCALAPPDATA%\\JARVIS\\models\\{VoskEngine.DefaultModelName})", voskModel),
                 K.Labeled("Папка модели PocketSphinx (пусто = %LOCALAPPDATA%\\JARVIS\\models\\cmusphinx-ru-5.2)", model), _modelStatus,
                 K.Hint($"Установленные распознаватели Windows SAPI: {(sapiCultures.Count == 0 ? "нет" : string.Join(", ", sapiCultures))}"),
@@ -108,6 +111,12 @@ public sealed class VoicePage : UserControl, IPage
             var dir = _c.VoskModelDir;
             var problem = VoskEngine.ValidateModel(dir);
             text = problem is null ? $"Модель Vosk найдена: {dir}" : $"⚠ {problem}. Запустите scripts\\install-models.cmd";
+        }
+        else if (engine == SpeechEngineKind.GigaAm)
+        {
+            var dir = _c.GigaAmModelDir;
+            var problem = GigaAmEngine.ValidateModel(dir);
+            text = problem is null ? $"Модель GigaAM найдена: {dir}" : $"⚠ {problem}. Запустите scripts\\install-models.cmd";
         }
         else text = "Модель не требуется";
         _modelStatus.Text = text + $"\nСостояние: {_c.VoiceStatus}";

@@ -16,7 +16,7 @@ namespace Jarvis.App.Services;
 
 /// <summary>
 /// Неинтерактивная самопроверка собранного приложения на реальной Windows:
-/// JARVIS.exe --selftest [--report путь] [--model папка] [--vosk-model папка] [--tessdata папка] [--desktop] [--benchmark]
+/// JARVIS.exe --selftest [--report путь] [--model папка] [--vosk-model папка] [--gigaam-model папка] [--tessdata папка] [--desktop] [--benchmark]
 /// Проверяет загрузку нативных библиотек, распознаватель, OCR, SAPI, окна и
 /// (с --desktop) сквозной сценарий «открой/сверни/закрой блокнот» через конвейер команд.
 /// </summary>
@@ -31,6 +31,7 @@ internal static class SelfTest
         var reportPath = Arg("--report", Path.Combine(AppContext.BaseDirectory, "selftest-report.txt"));
         var model = Arg("--model", "");
         var voskModel = Arg("--vosk-model", "");
+        var gigaModel = Arg("--gigaam-model", "");
         var tess = Arg("--tessdata", "");
         var desktop = args.Contains("--desktop");
 
@@ -82,6 +83,21 @@ internal static class SelfTest
                 return $"{engine.Status}, init {init} мс, 2 с тишины {sw.ElapsedMilliseconds} мс → {(silent is null ? "нет результата (верно)" : silent.Text)}";
             });
         else Skip("Vosk: модель", "модель не указана (--vosk-model)");
+
+        if (Directory.Exists(gigaModel))
+            Check("GigaAM v3: загрузка модели и распознавание", () =>
+            {
+                using var engine = new GigaAmEngine(gigaModel);
+                var spec = VocabularyBuilder.Build(new JarvisSettings(), BuiltInApps.All.Select(BuiltInApps.ToEntry), ["рабочий режим"]);
+                var sw = Stopwatch.StartNew();
+                engine.Initialize(spec);
+                var init = sw.ElapsedMilliseconds;
+                if (!engine.IsReady) throw new InvalidOperationException(engine.Status);
+                sw.Restart();
+                var silent = engine.Recognize(new short[32000]);
+                return $"{engine.Status}, init {init} мс, 2 с тишины {sw.ElapsedMilliseconds} мс → {(silent is null ? "нет результата (верно)" : silent.Text)}";
+            });
+        else Skip("GigaAM v3: модель", "модель не указана (--gigaam-model)");
 
         Check("Windows SAPI: синтез речи", () =>
         {
@@ -172,6 +188,7 @@ internal static class SelfTest
                 Task.FromResult(c.Benchmarks.SessionsStarted == 0 ? "сеансов до явного запроса: 0" : throw new InvalidOperationException("бенчмарк запускался сам")));
             if (Directory.Exists(model)) c.Settings.Update(x => x.PocketSphinxModelPath = model);
             if (Directory.Exists(voskModel)) c.Settings.Update(x => x.VoskModelPath = voskModel);
+            if (Directory.Exists(gigaModel)) c.Settings.Update(x => x.GigaAmModelPath = gigaModel);
             if (Directory.Exists(tess))
                 foreach (var f in Directory.GetFiles(tess, "*.traineddata")) File.Copy(f, Path.Combine(c.Paths.TessdataDir, Path.GetFileName(f)), true);
             await CheckAsync("Бенчмарк: один комплексный сеанс по запросу", async () =>

@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
   Скачивает локальные модели для JARVIS:
+   - модель распознавания речи GigaAM v3 (Сбер, MIT, ~225 МБ) — движок по умолчанию;
    - модель распознавания речи Vosk для русского языка (vosk-model-small-ru-0.22, ~45 МБ, лёгкая нейросеть);
    - (по ключу -WithPocketSphinx) акустическую модель CMUSphinx (cmusphinx-ru-5.2, GMM-HMM);
    - классические (legacy) языковые данные Tesseract rus + eng для OCR.
@@ -23,6 +24,20 @@ $ProgressPreference = "SilentlyContinue"
 $models = Join-Path $Root "models"
 $tess   = Join-Path $Root "tessdata"
 New-Item -ItemType Directory -Force -Path $models, $tess | Out-Null
+
+$gigaDir = Join-Path $models "gigaam-v3-ctc"
+$gigaBase = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-ctc-giga-am-v3-russian-2025-12-16/resolve/main"
+New-Item -ItemType Directory -Force -Path $gigaDir | Out-Null
+foreach ($f in @("tokens.txt", "LICENSE", "model.int8.onnx")) {
+    $target = Join-Path $gigaDir $f
+    if ((Test-Path $target) -and ((Get-Item $target).Length -gt 0)) { continue }
+    if ($f -eq "model.int8.onnx") { Write-Host "Скачивание модели GigaAM v3 (~225 МБ, несколько минут)..." }
+    $tmp = "$target.part"
+    Invoke-WebRequest -Uri "$gigaBase/$f" -OutFile $tmp -MaximumRedirection 10
+    Move-Item -Force $tmp $target
+}
+if ((Get-Item (Join-Path $gigaDir "model.int8.onnx")).Length -lt 100MB) { throw "Файл модели GigaAM скачан не полностью — запустите скрипт ещё раз" }
+Write-Host "Модель GigaAM v3 установлена: $gigaDir"
 
 $voskName = "vosk-model-small-ru-0.22"
 $voskDir = Join-Path $models $voskName
