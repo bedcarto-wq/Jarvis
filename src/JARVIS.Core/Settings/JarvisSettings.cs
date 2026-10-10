@@ -16,6 +16,8 @@ public enum StopReaction
 
 public enum SpeechEngineKind
 {
+    /// <summary>Vosk (Kaldi) с лёгкой моделью vosk-model-small-ru (~45 МБ), офлайн, ограниченный словарь команд.</summary>
+    Vosk,
     /// <summary>CMU PocketSphinx (классическая HMM/GMM-модель), офлайн, русский язык.</summary>
     PocketSphinx,
     /// <summary>Распознаватель Windows SAPI 5 (System.Speech), если установлен для нужного языка.</summary>
@@ -24,7 +26,7 @@ public enum SpeechEngineKind
     None,
 }
 
-public enum HudCorner { TopRight, TopLeft, BottomRight, BottomLeft }
+public enum HudCorner { TopRight, TopLeft, BottomRight, BottomLeft, Custom }
 
 public sealed class DangerousOperationSetting
 {
@@ -55,7 +57,9 @@ public sealed class JarvisSettings
     public bool DebugMode { get; set; }
 
     // Голос
-    public SpeechEngineKind SpeechEngine { get; set; } = SpeechEngineKind.PocketSphinx;
+    public SpeechEngineKind SpeechEngine { get; set; } = SpeechEngineKind.Vosk;
+    /// <summary>Версия выбора движка: старые настройки с PocketSphinx по умолчанию один раз переводятся на Vosk.</summary>
+    public int? SpeechEngineRevision { get; set; }
     public bool VoiceActivationEnabled { get; set; } = true;
     public bool MicrophoneMuted { get; set; }
     public int MicrophoneDeviceNumber { get; set; } = 0;
@@ -72,6 +76,7 @@ public sealed class JarvisSettings
     /// <summary>Минимальная нормированная оценка гипотезы PocketSphinx (больше — строже).</summary>
     public double RecognitionStrictness { get; set; } = 0.5;
     public string? PocketSphinxModelPath { get; set; }
+    public string? VoskModelPath { get; set; }
     public string SapiCulture { get; set; } = "ru-RU";
     public bool BeepOnListen { get; set; } = true;
     public bool BeepOnDone { get; set; } = true;
@@ -85,6 +90,9 @@ public sealed class JarvisSettings
     public bool HudAnimations { get; set; } = true;
     public HudCorner HudCorner { get; set; } = HudCorner.TopRight;
     public double HudOpacity { get; set; } = 0.92;
+    /// <summary>Положение плашки, перетащенной мышью (используется при HudCorner = Custom).</summary>
+    public double? HudLeft { get; set; }
+    public double? HudTop { get; set; }
 
     // Выполнение
     public int DefaultRetries { get; set; } = 3;
@@ -137,6 +145,11 @@ public sealed class JarvisSettings
         TtsRate = Math.Clamp(TtsRate, -10, 10);
         TtsVolume = Math.Clamp(TtsVolume, 0, 100);
         HudOpacity = Math.Clamp(HudOpacity, 0.3, 1.0);
+        if (SpeechEngineRevision is null or < 2)
+        {
+            if (SpeechEngine == SpeechEngineKind.PocketSphinx) SpeechEngine = SpeechEngineKind.Vosk;
+            SpeechEngineRevision = 2;
+        }
         DangerousOperations ??= DefaultDangerous();
         foreach (var c in Enum.GetValues<DangerCategory>().Where(c => c != DangerCategory.None))
             if (DangerousOperations.All(d => d.Category != c))

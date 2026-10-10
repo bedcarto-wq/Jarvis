@@ -23,8 +23,10 @@ public partial class HudWindow : Window
         {
             var h = new WindowInteropHelper(this).Handle;
             var ex = GetWindowLong(h, -20);
-            SetWindowLong(h, -20, ex | 0x08000000 /*NOACTIVATE*/ | 0x80 /*TOOLWINDOW*/ | 0x20 /*TRANSPARENT: клики проходят насквозь*/);
+            // Без WS_EX_TRANSPARENT: плашка принимает мышь, чтобы её можно было перетаскивать.
+            SetWindowLong(h, -20, ex | 0x08000000 /*NOACTIVATE*/ | 0x80 /*TOOLWINDOW*/);
         };
+        MouseLeftButtonDown += OnMouseDown;
         _clear = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _clear.Tick += (_, _) => { if (DateTime.Now > _lineUntil && LineText.Text.Length > 0 && _lineUntil != DateTime.MinValue) { LineText.Text = ""; StepTextBlock.Text = ""; _lineUntil = DateTime.MinValue; } };
         _clear.Start();
@@ -33,13 +35,40 @@ public partial class HudWindow : Window
     [DllImport("user32.dll")] private static extern int GetWindowLong(nint h, int i);
     [DllImport("user32.dll")] private static extern int SetWindowLong(nint h, int i, int v);
 
+    /// <summary>Пользователь перетащил плашку: новые координаты (Left, Top).</summary>
+    public event Action<double, double>? Moved;
+    /// <summary>Двойной щелчок: вернуть плашку в стандартный угол.</summary>
+    public event Action? ResetRequested;
+
+    private void OnMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ClickCount >= 2) { ResetRequested?.Invoke(); return; }
+        var (l, t) = (Left, Top);
+        try { DragMove(); } catch (InvalidOperationException) { return; }
+        if (Math.Abs(Left - l) > 1 || Math.Abs(Top - t) > 1) Moved?.Invoke(Left, Top);
+    }
+
     public void Apply(JarvisSettings s)
     {
         _animations = s.HudAnimations;
         Opacity = Math.Clamp(s.HudOpacity, 0.3, 1);
         Glow.Opacity = _animations ? 0.7 : 0;
-        Place(s.HudCorner);
+        if (s.HudCorner == HudCorner.Custom && s.HudLeft is { } x && s.HudTop is { } y) PlaceAt(x, y);
+        else Place(s.HudCorner == HudCorner.Custom ? HudCorner.TopRight : s.HudCorner);
         if (!_animations) StopAnim();
+    }
+
+    /// <summary>Ставит плашку в сохранённую точку, не давая ей уйти за пределы экранов.</summary>
+    private void PlaceAt(double x, double y)
+    {
+        UpdateLayout();
+        var h = ActualHeight > 0 ? ActualHeight : 110;
+        var l = SystemParameters.VirtualScreenLeft;
+        var t = SystemParameters.VirtualScreenTop;
+        var r = l + SystemParameters.VirtualScreenWidth;
+        var b = t + SystemParameters.VirtualScreenHeight;
+        Left = Math.Clamp(x, l, Math.Max(l, r - Width));
+        Top = Math.Clamp(y, t, Math.Max(t, b - h));
     }
 
     private void Place(HudCorner corner)

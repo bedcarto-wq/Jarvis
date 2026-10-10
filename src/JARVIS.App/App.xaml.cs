@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using Jarvis.App.Services;
 using Jarvis.App.Views;
 using Jarvis.Core.Abstractions;
+using Jarvis.Core.Settings;
 using Jarvis.Platform;
 using Forms = System.Windows.Forms;
 
@@ -67,6 +68,8 @@ public partial class App : Application
         _main = new MainWindow(_c);
         _hud = new HudWindow();
         _hud.Apply(_c.Settings.Current);
+        _hud.Moved += (x, y) => _c.Settings.Update(st => { st.HudCorner = HudCorner.Custom; st.HudLeft = x; st.HudTop = y; });
+        _hud.ResetRequested += () => _c.Settings.Update(st => { st.HudCorner = HudCorner.TopRight; st.HudLeft = null; st.HudTop = null; });
         if (_c.Settings.Current.HudEnabled) _hud.Show();
         _c.StateChanged += s => Dispatcher.BeginInvoke(() => { _hud?.SetState(s); UpdateTray(); });
         _c.Message += (m, lvl) => Dispatcher.BeginInvoke(() => _hud?.ShowLine(m, lvl == NotifyLevel.Error ? 10 : 6, lvl));

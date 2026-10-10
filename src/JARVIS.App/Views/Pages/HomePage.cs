@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Jarvis.App.Services;
 using Jarvis.Core.Logging;
+using Jarvis.Core.Settings;
 using Jarvis.Voice.Recognition;
 
 namespace Jarvis.App.Views.Pages;
@@ -75,9 +76,9 @@ public sealed class HomePage : UserControl, IPage
         _pause.Content = _c.Stop.Pause.IsPaused ? "Продолжить" : "Пауза";
         _disable.Content = _c.IsDisabled ? "Включить голос" : "Отключить голос";
         var notes = new List<string>();
-        var model = PocketSphinxEngine.ValidateModel(_c.PocketSphinxModelDir);
-        if (model is not null) notes.Add($"• Модель распознавания: {model}. Запустите scripts\\download-models.ps1 или см. docs\\VOICE.md.");
-        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "pocketsphinx.dll"))) notes.Add("• Рядом с JARVIS.exe нет pocketsphinx.dll — голосовое распознавание PocketSphinx недоступно (см. docs\\BUILD.md).");
+        var model = _c.ValidateActiveModel();
+        if (model is not null) notes.Add($"• Модель распознавания: {model}. Запустите scripts\\install-models.cmd или см. docs\\VOICE.md.");
+        if (_c.Settings.Current.SpeechEngine == SpeechEngineKind.PocketSphinx && !File.Exists(Path.Combine(AppContext.BaseDirectory, "pocketsphinx.dll"))) notes.Add("• Рядом с JARVIS.exe нет pocketsphinx.dll — голосовое распознавание PocketSphinx недоступно (см. docs\\BUILD.md).");
         if (!_c.Tts.HasRussianVoice) notes.Add("• " + _c.Tts.StatusMessage);
         if (!_c.Vision.OcrAvailable) notes.Add($"• OCR: {_c.Vision.OcrStatus}");
         if (!_c.Catalog.IsInitialized) notes.Add("• Идёт первичный поиск программ…");

@@ -27,7 +27,8 @@ JARVIS управляет компьютером голосом: открыва�
 
 1. Скачайте `JARVIS-Windows-x64.zip` из артефактов GitHub Actions (вкладка **Actions** → последний успешный запуск `build`) и распакуйте в любую папку.
 2. Запустите `scripts\install-models.cmd` — скрипт один раз скачает локальные модели:
-   акустическую модель CMUSphinx для русского языка и языковые данные Tesseract (rus, eng).
+   модель распознавания речи Vosk для русского языка (~45 МБ) и языковые данные Tesseract (rus, eng).
+   Модель PocketSphinx скачивается только с ключом `-WithPocketSphinx`.
 3. Запустите `JARVIS.exe`. На вкладке «Главная» виден чек-лист готовности (микрофон, модель, OCR, голос TTS).
 4. Скажите: **«Джарвис, открой блокнот»**.
 
@@ -77,7 +78,8 @@ JARVIS управляет компьютером голосом: открыва�
 
 ## Технологии
 
-C# / .NET 10, WPF; PocketSphinx 5 (CMU Sphinx, GMM-HMM, BSD) + модель cmusphinx-ru-5.2;
+C# / .NET 10, WPF; Vosk (Kaldi, Apache-2.0) + модель vosk-model-small-ru-0.22 — основное распознавание;
+PocketSphinx 5 (CMU Sphinx, GMM-HMM, BSD) + модель cmusphinx-ru-5.2 — запасной движок;
 Windows SAPI (System.Speech) — синтез речи и резервное распознавание; NAudio — микрофон и громкость;
 UI Automation; Tesseract 5 в режиме классического движка (без LSTM). Лицензии сторонних
 компонентов — [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Лицензия проекта — MIT.

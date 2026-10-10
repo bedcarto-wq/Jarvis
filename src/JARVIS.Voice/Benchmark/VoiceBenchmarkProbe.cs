@@ -18,6 +18,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
     private readonly Func<GrammarSpec> _grammar;
     private readonly string? _testAudioDir;
     private readonly Func<CancellationToken, Task<string?>>? _microphoneCheck;
+    private readonly bool _vosk;
 
     /// <param name="microphoneCheck">Открывает устройство на долю секунды и сразу закрывает; null при успехе или текст ошибки.</param>
     public VoiceBenchmarkProbe(string modelDir, string workDir, Func<GrammarSpec> grammar, string? testAudioDir,
@@ -30,7 +31,15 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         _microphoneCheck = microphoneCheck;
     }
 
-    public string Title => "Голосовой движок (PocketSphinx)";
+    private VoiceBenchmarkProbe(string modelDir, Func<GrammarSpec> grammar, string? testAudioDir,
+        Func<CancellationToken, Task<string?>>? microphoneCheck, bool vosk)
+        : this(modelDir, Path.GetTempPath(), grammar, testAudioDir, microphoneCheck) => _vosk = vosk;
+
+    /// <summary>Тот же замер для движка Vosk.</summary>
+    public static VoiceBenchmarkProbe ForVosk(string modelDir, Func<GrammarSpec> grammar, string? testAudioDir,
+        Func<CancellationToken, Task<string?>>? microphoneCheck) => new(modelDir, grammar, testAudioDir, microphoneCheck, true);
+
+    public string Title => _vosk ? "Голосовой движок (Vosk)" : "Голосовой движок (PocketSphinx)";
     public BenchmarkStage Stage => BenchmarkStage.Measuring;
 
     public async Task<IReadOnlyList<Measurement>> RunAsync(BenchmarkContext ctx, CancellationToken ct)
@@ -47,22 +56,24 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         }
         else list.Add(Measurement.Unavailable(MKeys.VoiceMic, g, "Открытие микрофона", "Не проверялось: нет разрешения пользователя"));
 
-        var problem = PocketSphinxEngine.ValidateModel(_modelDir);
+        var problem = _vosk ? VoskEngine.ValidateModel(_modelDir) : PocketSphinxEngine.ValidateModel(_modelDir);
         if (problem is not null && !problem.Contains("ru.dic"))
         {
             list.Add(Measurement.Unavailable(MKeys.VoiceModel, g, "Русская акустическая модель", problem));
             list.Add(Measurement.Unavailable(MKeys.VoiceRtf, g, "Скорость распознавания", "Модель не установлена"));
-            list.Add(Measurement.Unavailable(MKeys.VoiceAccuracy, g, "Точность на тестовых записях", "Модель не установлена"));
             return list;
         }
-        list.Add(new(MKeys.VoiceModel, g, "Русская акустическая модель", 1, "", "cmusphinx-ru-5.2 (GMM-HMM, не нейросеть)", problem));
+        list.Add(new(MKeys.VoiceModel, g, "Русская акустическая модель", 1, "",
+            _vosk ? $"{Path.GetFileName(_modelDir.TrimEnd('/', '\\'))} (Vosk, лёгкая нейросеть)" : "cmusphinx-ru-5.2 (GMM-HMM, не нейросеть)", problem));
 
         var p = ctx.CurrentParameters;
-        using var engine = new PocketSphinxEngine(_modelDir, _workDir)
-        {
-            MaxHmmPf = (int)(p.TryGetValue("voice.maxHmmPf", out var m) ? m : 3000),
-            BeamExp = (int)(p.TryGetValue("voice.beamExp", out var b) ? b : 30),
-        };
+        using ISpeechEngine engine = _vosk
+            ? new VoskEngine(_modelDir)
+            : new PocketSphinxEngine(_modelDir, _workDir)
+            {
+                MaxHmmPf = (int)(p.TryGetValue("voice.maxHmmPf", out var m) ? m : 3000),
+                BeamExp = (int)(p.TryGetValue("voice.beamExp", out var b) ? b : 30),
+            };
         var spec = _grammar();
         using var proc = Process.GetCurrentProcess();
         var mem0 = proc.PrivateMemorySize64;
@@ -72,11 +83,10 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         {
             list.Add(Measurement.Unavailable(MKeys.VoiceInitMs, g, "Инициализация распознавателя", ex.Message));
             list.Add(Measurement.Unavailable(MKeys.VoiceRtf, g, "Скорость распознавания", "Распознаватель не запустился"));
-            list.Add(Measurement.Unavailable(MKeys.VoiceAccuracy, g, "Точность на тестовых записях", "Распознаватель не запустился"));
             return list;
         }
         list.Add(new(MKeys.VoiceInitMs, g, "Инициализация распознавателя", sw.Elapsed.TotalMilliseconds, "мс",
-            null, $"maxhmmpf={engine.MaxHmmPf}, beam=1e-{engine.BeamExp}"));
+            null, engine is PocketSphinxEngine ps ? $"maxhmmpf={ps.MaxHmmPf}, beam=1e-{ps.BeamExp}" : engine.Status));
         proc.Refresh();
         if (mem0 > 0) list.Add(new(MKeys.VoiceMemMb, g, "Память распознавателя", Math.Max(0, (proc.PrivateMemorySize64 - mem0) / 1048576.0), "МБ"));
         list.Add(new(MKeys.VoiceCommands, g, "Слов в грамматике команд", spec.AllWords().Count(), "шт."));
@@ -101,7 +111,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         return list;
     }
 
-    private Measurement MeasureAccuracy(PocketSphinxEngine engine, CancellationToken ct)
+    private Measurement MeasureAccuracy(ISpeechEngine engine, CancellationToken ct)
     {
         const string g = "Распознавание речи";
         const string title = "Точность на тестовых записях";

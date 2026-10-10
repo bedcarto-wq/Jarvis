@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="JARVIS HUD" Width="330" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Focusable="False">
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" Focusable="False"
+        Cursor="SizeAll" ToolTip="Перетащите, чтобы переместить. Двойной щелчок — вернуть в угол.">
   <Border x:Name="Frame" CornerRadius="14" Padding="12" BorderThickness="1.5" BorderBrush="{StaticResource Accent}">
     <Border.Background>
       <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
