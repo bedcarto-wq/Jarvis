@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-  Скачивает локальные (не нейросетевые) модели для JARVIS:
-   - акустическую модель CMUSphinx для русского языка (cmusphinx-ru-5.2, GMM-HMM);
+  Скачивает локальные модели для JARVIS:
+   - модель распознавания речи Vosk для русского языка (vosk-model-small-ru-0.22, ~45 МБ, лёгкая нейросеть);
+   - (по ключу -WithPocketSphinx) акустическую модель CMUSphinx (cmusphinx-ru-5.2, GMM-HMM);
    - классические (legacy) языковые данные Tesseract rus + eng для OCR.
   После загрузки интернет для работы JARVIS не нужен.
 .PARAMETER Root
@@ -12,6 +13,7 @@
 param(
     [string]$Root = (Join-Path $env:LOCALAPPDATA "JARVIS"),
     [switch]$KeepLanguageModel,
+    [switch]$WithPocketSphinx,
     [switch]$SkipOcr
 )
 $ErrorActionPreference = "Stop"
@@ -22,8 +24,25 @@ $models = Join-Path $Root "models"
 $tess   = Join-Path $Root "tessdata"
 New-Item -ItemType Directory -Force -Path $models, $tess | Out-Null
 
+$voskName = "vosk-model-small-ru-0.22"
+$voskDir = Join-Path $models $voskName
+if (Test-Path (Join-Path $voskDir "am\final.mdl")) {
+    Write-Host "Модель Vosk уже установлена: $voskDir"
+} else {
+    $zip = Join-Path $env:TEMP "$voskName.zip"
+    Write-Host "Скачивание модели распознавания речи Vosk (~45 МБ)..."
+    Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/$voskName.zip" -OutFile $zip -MaximumRedirection 10
+    Write-Host "Распаковка..."
+    Expand-Archive -Path $zip -DestinationPath $models -Force
+    Remove-Item $zip -Force
+    if (-not (Test-Path (Join-Path $voskDir "am\final.mdl"))) { throw "Архив Vosk распакован, но модель не найдена в $voskDir" }
+    Write-Host "Модель установлена: $voskDir"
+}
+
 $modelDir = Join-Path $models "cmusphinx-ru-5.2"
-if (Test-Path (Join-Path $modelDir "mdef")) {
+if (-not $WithPocketSphinx) {
+    Write-Host "PocketSphinx пропущен (нужен только при выборе этого движка; добавьте -WithPocketSphinx)."
+} elseif (Test-Path (Join-Path $modelDir "mdef")) {
     Write-Host "Акустическая модель уже установлена: $modelDir"
 } else {
     $tgz = Join-Path $env:TEMP "cmusphinx-ru-5.2.tar.gz"

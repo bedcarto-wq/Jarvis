@@ -75,8 +75,11 @@ public sealed partial class JarvisController
             new WindowsSystemProbe(Paths.Root),
             new RuntimeSystemProbe(Paths.Root),
             new SelfLoadProbe(),
-            new VoiceBenchmarkProbe(PocketSphinxModelDir, work, BuildGrammar, Paths.BenchmarkAudioDir,
-                ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct)),
+            s.SpeechEngine == SpeechEngineKind.PocketSphinx
+                ? new VoiceBenchmarkProbe(PocketSphinxModelDir, work, BuildGrammar, Paths.BenchmarkAudioDir,
+                    ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct))
+                : VoiceBenchmarkProbe.ForVosk(VoskModelDir, BuildGrammar, Paths.BenchmarkAudioDir,
+                    ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct)),
             new OcrBenchmarkProbe(Paths.TessdataDir, s.OcrLanguages),
             new UiaBenchmarkProbe(Windows, Vision),
             new TemplateBenchmarkProbe(),

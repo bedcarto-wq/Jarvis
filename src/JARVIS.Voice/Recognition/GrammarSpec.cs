@@ -124,6 +124,21 @@ public sealed partial class GrammarSpec
     /// <summary>Плоский список фраз (для SAPI): с фразой активации и без неё.</summary>
     public IReadOnlyList<string> ExpandPhrases(int max = 20000)
     {
+        var cmds = ExpandCommands();
+        var all = new List<string>();
+        foreach (var w in Valid(WakePhrases))
+        {
+            all.Add(w);
+            all.AddRange(cmds.Select(c => $"{w} {c}"));
+        }
+        all.AddRange(cmds);
+        if (StopWord.Length > 0) all.Add(Clean(StopWord));
+        return all.Distinct().Take(max).ToList();
+    }
+
+    /// <summary>Все команды без фразы активации.</summary>
+    public List<string> ExpandCommands()
+    {
         var cmds = new List<string>(FixedPhrases());
         var apps = Valid(AppNames).ToList();
         foreach (var v in OpenVerbs.Concat(SwitchVerbs).Concat(CloseVerbs).Concat(AppVerbsOther))
@@ -139,15 +154,7 @@ public sealed partial class GrammarSpec
         foreach (var v in StepAppVerbs) foreach (var a in apps) cmds.Add($"добавь {v} {a}");
         foreach (var f in StepFixed) cmds.Add($"добавь {f}");
         foreach (var s in new[] { 1, 2, 3, 5, 10, 15, 20, 30 }) cmds.Add($"добавь ожидание {NumberToWords(s)} секунд");
-        var all = new List<string>();
-        foreach (var w in Valid(WakePhrases))
-        {
-            all.Add(w);
-            all.AddRange(cmds.Select(c => $"{w} {c}"));
-        }
-        all.AddRange(cmds);
-        if (StopWord.Length > 0) all.Add(Clean(StopWord));
-        return all.Distinct().Take(max).ToList();
+        return cmds.Distinct().ToList();
     }
 
     public static string NumberToWords(int n)
@@ -181,7 +188,7 @@ public sealed partial class GrammarSpec
 
 public sealed record RecognitionResult(string Text, double Confidence);
 
-/// <summary>Офлайн-распознаватель фраз (PocketSphinx или Windows SAPI).</summary>
+/// <summary>Офлайн-распознаватель фраз (Vosk, PocketSphinx или Windows SAPI).</summary>
 public interface ISpeechEngine : IDisposable
 {
     string Name { get; }

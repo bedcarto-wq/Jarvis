@@ -54,7 +54,7 @@ jobs:
 
       - name: Загрузка моделей (для интеграционных тестов и самопроверки)
         continue-on-error: true
-        run: ./scripts/download-models.ps1 -Root "${{ runner.temp }}/jarvis-data"
+        run: ./scripts/download-models.ps1 -Root "${{ runner.temp }}/jarvis-data" -WithPocketSphinx
 
       - name: Restore
         run: dotnet restore JARVIS.sln
@@ -67,6 +67,8 @@ jobs:
           $env:JARVIS_POCKETSPHINX_LIB = (Resolve-Path native/win-x64/pocketsphinx.dll).Path
           $model = "${{ runner.temp }}/jarvis-data/models/cmusphinx-ru-5.2"
           if (Test-Path $model) { $env:JARVIS_PS_MODEL = $model } else { Write-Warning "Модель не загружена: интеграционный тест декодера будет пропущен" }
+          $vosk = "${{ runner.temp }}/jarvis-data/models/vosk-model-small-ru-0.22"
+          if (Test-Path $vosk) { $env:JARVIS_VOSK_MODEL = $vosk } else { Write-Warning "Модель Vosk не загружена: интеграционный тест Vosk будет пропущен" }
           dotnet test JARVIS.sln -c Release --no-build --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory artifacts/test-results
 
       - name: Publish (self-contained win-x64)
@@ -77,6 +79,7 @@ jobs:
           $pkg = "artifacts/publish/JARVIS"
           if (-not (Test-Path "$pkg/JARVIS.exe")) { throw "JARVIS.exe отсутствует" }
           if (-not (Test-Path "$pkg/pocketsphinx.dll")) { throw "pocketsphinx.dll отсутствует в публикации" }
+          if (-not (Test-Path "$pkg/libvosk.dll")) { throw "libvosk.dll отсутствует в публикации" }
           New-Item -ItemType Directory -Force "$pkg/scripts", "$pkg/docs" | Out-Null
           Copy-Item scripts/download-models.ps1, scripts/install-models.cmd "$pkg/scripts/"
           Copy-Item docs/*.md "$pkg/docs/"
@@ -89,6 +92,7 @@ jobs:
           $data = "${{ runner.temp }}/jarvis-data"
           $a = @("--selftest", "--desktop", "--benchmark", "--report", "$PWD/artifacts/selftest-report.txt")
           if (Test-Path "$data/models/cmusphinx-ru-5.2") { $a += @("--model", "$data/models/cmusphinx-ru-5.2") }
+          if (Test-Path "$data/models/vosk-model-small-ru-0.22") { $a += @("--vosk-model", "$data/models/vosk-model-small-ru-0.22") }
           if (Test-Path "$data/tessdata/rus.traineddata") { $a += @("--tessdata", "$data/tessdata") }
           $p = Start-Process -FilePath artifacts/publish/JARVIS/JARVIS.exe -ArgumentList $a -PassThru -Wait
           Get-Content artifacts/selftest-report.txt

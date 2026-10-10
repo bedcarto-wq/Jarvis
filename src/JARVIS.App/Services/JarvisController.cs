@@ -170,6 +170,19 @@ public sealed partial class JarvisController : IDisposable
             ? Path.Combine(Paths.ModelsDir, "cmusphinx-ru-5.2")
             : Settings.Current.PocketSphinxModelPath!;
 
+    public string VoskModelDir =>
+        string.IsNullOrWhiteSpace(Settings.Current.VoskModelPath)
+            ? Path.Combine(Paths.ModelsDir, VoskEngine.DefaultModelName)
+            : Settings.Current.VoskModelPath!;
+
+    /// <summary>Папка модели выбранного движка (для подсказок в интерфейсе).</summary>
+    public string? ValidateActiveModel() => Settings.Current.SpeechEngine switch
+    {
+        SpeechEngineKind.Vosk => VoskEngine.ValidateModel(VoskModelDir),
+        SpeechEngineKind.PocketSphinx => PocketSphinxEngine.ValidateModel(PocketSphinxModelDir) is { } p && !p.Contains("ru.dic") ? p : null,
+        _ => null,
+    };
+
     public void StartVoice()
     {
         StopVoice();
@@ -180,14 +193,17 @@ public sealed partial class JarvisController : IDisposable
             RecomputeState();
             return;
         }
-        ISpeechEngine engine = s.SpeechEngine == SpeechEngineKind.WindowsSapi
-            ? new SapiRecognizer(s.SapiCulture, Log) { MinConfidence = 0.3 + 0.5 * s.RecognitionStrictness }
-            : new PocketSphinxEngine(PocketSphinxModelDir, Paths.ModelsDir, Log)
+        ISpeechEngine engine = s.SpeechEngine switch
+        {
+            SpeechEngineKind.WindowsSapi => new SapiRecognizer(s.SapiCulture, Log) { MinConfidence = 0.3 + 0.5 * s.RecognitionStrictness },
+            SpeechEngineKind.PocketSphinx => new PocketSphinxEngine(PocketSphinxModelDir, Paths.ModelsDir, Log)
             {
                 Strictness = s.RecognitionStrictness,
                 MaxHmmPf = s.Performance.RecognizerMaxHmmPf,
                 BeamExp = s.Performance.RecognizerBeamExp,
-            };
+            },
+            _ => new VoskEngine(VoskModelDir, Log) { Strictness = s.RecognitionStrictness },
+        };
         _voiceTuning = (s.Performance.RecognizerMaxHmmPf, s.Performance.RecognizerBeamExp);
         try
         {
@@ -280,6 +296,7 @@ public sealed partial class JarvisController : IDisposable
             Voice.Muted = s.MicrophoneMuted;
         }
         if (Engine is PocketSphinxEngine ps) ps.Strictness = s.RecognitionStrictness;
+        if (Engine is VoskEngine vk) vk.Strictness = s.RecognitionStrictness;
         OnPerformanceSettingsChanged(s);
         ScheduleGrammarRefresh();
         RecomputeState();

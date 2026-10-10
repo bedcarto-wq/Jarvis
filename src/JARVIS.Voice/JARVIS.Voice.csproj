@@ -9,4 +9,7 @@
     <ProjectReference Include="..\JARVIS.Core\JARVIS.Core.csproj" />
     <InternalsVisibleTo Include="JARVIS.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Vosk" Version="0.3.38" />
+  </ItemGroup>
 </Project>

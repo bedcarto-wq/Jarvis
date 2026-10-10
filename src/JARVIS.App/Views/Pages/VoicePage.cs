@@ -26,10 +26,12 @@ public sealed class VoicePage : UserControl, IPage
             v => { U(x => x.MicrophoneDeviceNumber = v); });
         var engine = K.Combo(new (SpeechEngineKind, string)[]
         {
-            (SpeechEngineKind.PocketSphinx, "CMU PocketSphinx (рекомендуется, офлайн, без нейросетей)"),
+            (SpeechEngineKind.Vosk, "Vosk small-ru (рекомендуется, офлайн, лёгкая нейросеть ~45 МБ)"),
+            (SpeechEngineKind.PocketSphinx, "CMU PocketSphinx (офлайн, без нейросетей, низкая точность)"),
             (SpeechEngineKind.WindowsSapi, "Распознаватель Windows SAPI (нужен русский распознаватель Windows)"),
             (SpeechEngineKind.None, "Выключено (только текстовые команды)"),
-        }, s.SpeechEngine, v => U(x => x.SpeechEngine = v), 460);
+        }, s.SpeechEngine, v => { U(x => x.SpeechEngine = v); UpdateModelStatus(); }, 460);
+        var voskModel = K.Box(s.VoskModelPath ?? "", v => { U(x => x.VoskModelPath = string.IsNullOrWhiteSpace(v) ? null : v.Trim()); UpdateModelStatus(); });
         var model = K.Box(s.PocketSphinxModelPath ?? "", v => { U(x => x.PocketSphinxModelPath = string.IsNullOrWhiteSpace(v) ? null : v.Trim()); UpdateModelStatus(); });
         var wake = K.Box(string.Join(Environment.NewLine, s.WakePhrases), v => U(x => x.WakePhrases =
             v.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()), multiline: true);
@@ -50,6 +52,7 @@ public sealed class VoicePage : UserControl, IPage
             K.H1("Голос"),
             K.Card(K.H2("Распознавание речи"),
                 K.Labeled("Движок", engine),
+                K.Labeled($"Папка модели Vosk (пусто = %LOCALAPPDATA%\\JARVIS\\models\\{VoskEngine.DefaultModelName})", voskModel),
                 K.Labeled("Папка модели PocketSphinx (пусто = %LOCALAPPDATA%\\JARVIS\\models\\cmusphinx-ru-5.2)", model), _modelStatus,
                 K.Hint($"Установленные распознаватели Windows SAPI: {(sapiCultures.Count == 0 ? "нет" : string.Join(", ", sapiCultures))}"),
                 K.Labeled("Микрофон", mic),
@@ -90,11 +93,23 @@ public sealed class VoicePage : UserControl, IPage
 
     private void UpdateModelStatus()
     {
-        var dir = _c.PocketSphinxModelDir;
-        var problem = PocketSphinxEngine.ValidateModel(dir);
-        var dll = File.Exists(Path.Combine(AppContext.BaseDirectory, "pocketsphinx.dll"));
-        _modelStatus.Text = (problem is null ? $"Модель найдена: {dir}" : $"⚠ {problem}") +
-                            (dll ? "" : "\n⚠ Не найден pocketsphinx.dll рядом с программой") +
-                            $"\nСостояние: {_c.VoiceStatus}";
+        var engine = _c.Settings.Current.SpeechEngine;
+        string text;
+        if (engine == SpeechEngineKind.PocketSphinx)
+        {
+            var dir = _c.PocketSphinxModelDir;
+            var problem = PocketSphinxEngine.ValidateModel(dir);
+            var dll = File.Exists(Path.Combine(AppContext.BaseDirectory, "pocketsphinx.dll"));
+            text = (problem is null ? $"Модель PocketSphinx найдена: {dir}" : $"⚠ {problem}") +
+                   (dll ? "" : "\n⚠ Не найден pocketsphinx.dll рядом с программой");
+        }
+        else if (engine == SpeechEngineKind.Vosk)
+        {
+            var dir = _c.VoskModelDir;
+            var problem = VoskEngine.ValidateModel(dir);
+            text = problem is null ? $"Модель Vosk найдена: {dir}" : $"⚠ {problem}. Запустите scripts\\install-models.cmd";
+        }
+        else text = "Модель не требуется";
+        _modelStatus.Text = text + $"\nСостояние: {_c.VoiceStatus}";
     }
 }
