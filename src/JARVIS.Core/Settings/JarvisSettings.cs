@@ -24,7 +24,7 @@ public enum SpeechEngineKind
     None,
 }
 
-public enum HudCorner { TopRight, TopLeft, BottomRight, BottomLeft }
+public enum HudCorner { TopRight, TopLeft, BottomRight, BottomLeft, Custom }
 
 public sealed class DangerousOperationSetting
 {
@@ -85,6 +85,9 @@ public sealed class JarvisSettings
     public bool HudAnimations { get; set; } = true;
     public HudCorner HudCorner { get; set; } = HudCorner.TopRight;
     public double HudOpacity { get; set; } = 0.92;
+    /// <summary>Положение плашки, перетащенной мышью (используется при HudCorner = Custom).</summary>
+    public double? HudLeft { get; set; }
+    public double? HudTop { get; set; }
 
     // Выполнение
     public int DefaultRetries { get; set; } = 3;

@@ -71,7 +71,9 @@ public sealed class PerformancePage : UserControl, IPage
                 {
                     (HudCorner.TopRight, "Справа сверху"), (HudCorner.TopLeft, "Слева сверху"),
                     (HudCorner.BottomRight, "Справа снизу"), (HudCorner.BottomLeft, "Слева снизу"),
+                    (HudCorner.Custom, "Своё место (перетащите плашку мышью)"),
                 }, s.HudCorner, v => U(x => x.HudCorner = v))),
+                K.Hint("Плашку можно перетащить левой кнопкой мыши. Двойной щелчок по ней возвращает её в выбранный угол."),
                 K.Labeled("Непрозрачность (0,3…1)", K.Number(s.HudOpacity, v => U(x => x.HudOpacity = v), 0.3, 1)),
                 K.Hint("Анимации и частота обновления HUD задаются профилем.")),
             K.Card(K.H2("Надёжность выполнения (не входит в профиль)"),
