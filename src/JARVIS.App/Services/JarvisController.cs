@@ -175,9 +175,15 @@ public sealed partial class JarvisController : IDisposable
             ? Path.Combine(Paths.ModelsDir, VoskEngine.DefaultModelName)
             : Settings.Current.VoskModelPath!;
 
-    /// <summary>Папка модели выбранного движка (для подсказок в интерфейсе).</summary>
+    public string GigaAmModelDir =>
+        string.IsNullOrWhiteSpace(Settings.Current.GigaAmModelPath)
+            ? Path.Combine(Paths.ModelsDir, GigaAmEngine.DefaultModelName)
+            : Settings.Current.GigaAmModelPath!;
+
+    /// <summary>Проблема с моделью выбранного движка (для подсказок в интерфейсе) или null.</summary>
     public string? ValidateActiveModel() => Settings.Current.SpeechEngine switch
     {
+        SpeechEngineKind.GigaAm => GigaAmEngine.ValidateModel(GigaAmModelDir),
         SpeechEngineKind.Vosk => VoskEngine.ValidateModel(VoskModelDir),
         SpeechEngineKind.PocketSphinx => PocketSphinxEngine.ValidateModel(PocketSphinxModelDir) is { } p && !p.Contains("ru.dic") ? p : null,
         _ => null,
@@ -202,7 +208,8 @@ public sealed partial class JarvisController : IDisposable
                 MaxHmmPf = s.Performance.RecognizerMaxHmmPf,
                 BeamExp = s.Performance.RecognizerBeamExp,
             },
-            _ => new VoskEngine(VoskModelDir, Log) { Strictness = s.RecognitionStrictness },
+            SpeechEngineKind.Vosk => new VoskEngine(VoskModelDir, Log) { Strictness = s.RecognitionStrictness },
+            _ => new GigaAmEngine(GigaAmModelDir, Log) { Strictness = s.RecognitionStrictness },
         };
         _voiceTuning = (s.Performance.RecognizerMaxHmmPf, s.Performance.RecognizerBeamExp);
         try
@@ -297,6 +304,7 @@ public sealed partial class JarvisController : IDisposable
         }
         if (Engine is PocketSphinxEngine ps) ps.Strictness = s.RecognitionStrictness;
         if (Engine is VoskEngine vk) vk.Strictness = s.RecognitionStrictness;
+        if (Engine is GigaAmEngine ga) ga.Strictness = s.RecognitionStrictness;
         OnPerformanceSettingsChanged(s);
         ScheduleGrammarRefresh();
         RecomputeState();

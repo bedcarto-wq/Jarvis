@@ -19,6 +19,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
     private readonly string? _testAudioDir;
     private readonly Func<CancellationToken, Task<string?>>? _microphoneCheck;
     private readonly bool _vosk;
+    private readonly bool _giga;
 
     /// <param name="microphoneCheck">Открывает устройство на долю секунды и сразу закрывает; null при успехе или текст ошибки.</param>
     public VoiceBenchmarkProbe(string modelDir, string workDir, Func<GrammarSpec> grammar, string? testAudioDir,
@@ -32,14 +33,18 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
     }
 
     private VoiceBenchmarkProbe(string modelDir, Func<GrammarSpec> grammar, string? testAudioDir,
-        Func<CancellationToken, Task<string?>>? microphoneCheck, bool vosk)
-        : this(modelDir, Path.GetTempPath(), grammar, testAudioDir, microphoneCheck) => _vosk = vosk;
+        Func<CancellationToken, Task<string?>>? microphoneCheck, bool vosk, bool giga = false)
+        : this(modelDir, Path.GetTempPath(), grammar, testAudioDir, microphoneCheck) { _vosk = vosk; _giga = giga; }
+
+    /// <summary>Тот же замер для GigaAM v3.</summary>
+    public static VoiceBenchmarkProbe ForGigaAm(string modelDir, Func<GrammarSpec> grammar, string? testAudioDir,
+        Func<CancellationToken, Task<string?>>? microphoneCheck) => new(modelDir, grammar, testAudioDir, microphoneCheck, false, true);
 
     /// <summary>Тот же замер для движка Vosk.</summary>
     public static VoiceBenchmarkProbe ForVosk(string modelDir, Func<GrammarSpec> grammar, string? testAudioDir,
         Func<CancellationToken, Task<string?>>? microphoneCheck) => new(modelDir, grammar, testAudioDir, microphoneCheck, true);
 
-    public string Title => _vosk ? "Голосовой движок (Vosk)" : "Голосовой движок (PocketSphinx)";
+    public string Title => _giga ? "Голосовой движок (GigaAM v3)" : _vosk ? "Голосовой движок (Vosk)" : "Голосовой движок (PocketSphinx)";
     public BenchmarkStage Stage => BenchmarkStage.Measuring;
 
     public async Task<IReadOnlyList<Measurement>> RunAsync(BenchmarkContext ctx, CancellationToken ct)
@@ -56,7 +61,7 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
         }
         else list.Add(Measurement.Unavailable(MKeys.VoiceMic, g, "Открытие микрофона", "Не проверялось: нет разрешения пользователя"));
 
-        var problem = _vosk ? VoskEngine.ValidateModel(_modelDir) : PocketSphinxEngine.ValidateModel(_modelDir);
+        var problem = _giga ? GigaAmEngine.ValidateModel(_modelDir) : _vosk ? VoskEngine.ValidateModel(_modelDir) : PocketSphinxEngine.ValidateModel(_modelDir);
         if (problem is not null && !problem.Contains("ru.dic"))
         {
             list.Add(Measurement.Unavailable(MKeys.VoiceModel, g, "Русская акустическая модель", problem));
@@ -64,10 +69,10 @@ public sealed class VoiceBenchmarkProbe : IBenchmarkProbe
             return list;
         }
         list.Add(new(MKeys.VoiceModel, g, "Русская акустическая модель", 1, "",
-            _vosk ? $"{Path.GetFileName(_modelDir.TrimEnd('/', '\\'))} (Vosk, лёгкая нейросеть)" : "cmusphinx-ru-5.2 (GMM-HMM, не нейросеть)", problem));
+            _giga ? "GigaAM v3 CTC int8 (Сбер, нейросеть)" : _vosk ? $"{Path.GetFileName(_modelDir.TrimEnd('/', '\\'))} (Vosk, лёгкая нейросеть)" : "cmusphinx-ru-5.2 (GMM-HMM, не нейросеть)", problem));
 
         var p = ctx.CurrentParameters;
-        using ISpeechEngine engine = _vosk
+        using ISpeechEngine engine = _giga ? new GigaAmEngine(_modelDir) : _vosk
             ? new VoskEngine(_modelDir)
             : new PocketSphinxEngine(_modelDir, _workDir)
             {

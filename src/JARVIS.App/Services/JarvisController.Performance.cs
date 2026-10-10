@@ -78,8 +78,11 @@ public sealed partial class JarvisController
             s.SpeechEngine == SpeechEngineKind.PocketSphinx
                 ? new VoiceBenchmarkProbe(PocketSphinxModelDir, work, BuildGrammar, Paths.BenchmarkAudioDir,
                     ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct))
-                : VoiceBenchmarkProbe.ForVosk(VoskModelDir, BuildGrammar, Paths.BenchmarkAudioDir,
-                    ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct)),
+                : s.SpeechEngine == SpeechEngineKind.Vosk
+                    ? VoiceBenchmarkProbe.ForVosk(VoskModelDir, BuildGrammar, Paths.BenchmarkAudioDir,
+                        ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct))
+                    : VoiceBenchmarkProbe.ForGigaAm(GigaAmModelDir, BuildGrammar, Paths.BenchmarkAudioDir,
+                        ct => Audio.CheckDeviceAsync(s.MicrophoneDeviceNumber, ct)),
             new OcrBenchmarkProbe(Paths.TessdataDir, s.OcrLanguages),
             new UiaBenchmarkProbe(Windows, Vision),
             new TemplateBenchmarkProbe(),

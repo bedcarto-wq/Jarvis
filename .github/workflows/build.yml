@@ -69,6 +69,8 @@ jobs:
           if (Test-Path $model) { $env:JARVIS_PS_MODEL = $model } else { Write-Warning "Модель не загружена: интеграционный тест декодера будет пропущен" }
           $vosk = "${{ runner.temp }}/jarvis-data/models/vosk-model-small-ru-0.22"
           if (Test-Path $vosk) { $env:JARVIS_VOSK_MODEL = $vosk } else { Write-Warning "Модель Vosk не загружена: интеграционный тест Vosk будет пропущен" }
+          $giga = "${{ runner.temp }}/jarvis-data/models/gigaam-v3-ctc"
+          if (Test-Path "$giga/model.int8.onnx") { $env:JARVIS_GIGAAM_MODEL = $giga } else { Write-Warning "Модель GigaAM не загружена: интеграционный тест GigaAM будет пропущен" }
           dotnet test JARVIS.sln -c Release --no-build --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory artifacts/test-results
 
       - name: Publish (self-contained win-x64)
@@ -80,6 +82,7 @@ jobs:
           if (-not (Test-Path "$pkg/JARVIS.exe")) { throw "JARVIS.exe отсутствует" }
           if (-not (Test-Path "$pkg/pocketsphinx.dll")) { throw "pocketsphinx.dll отсутствует в публикации" }
           if (-not (Test-Path "$pkg/libvosk.dll")) { throw "libvosk.dll отсутствует в публикации" }
+          if (-not (Test-Path "$pkg/sherpa-onnx-c-api.dll")) { throw "sherpa-onnx-c-api.dll отсутствует в публикации" }
           New-Item -ItemType Directory -Force "$pkg/scripts", "$pkg/docs" | Out-Null
           Copy-Item scripts/download-models.ps1, scripts/install-models.cmd "$pkg/scripts/"
           Copy-Item docs/*.md "$pkg/docs/"
@@ -93,6 +96,7 @@ jobs:
           $a = @("--selftest", "--desktop", "--benchmark", "--report", "$PWD/artifacts/selftest-report.txt")
           if (Test-Path "$data/models/cmusphinx-ru-5.2") { $a += @("--model", "$data/models/cmusphinx-ru-5.2") }
           if (Test-Path "$data/models/vosk-model-small-ru-0.22") { $a += @("--vosk-model", "$data/models/vosk-model-small-ru-0.22") }
+          if (Test-Path "$data/models/gigaam-v3-ctc/model.int8.onnx") { $a += @("--gigaam-model", "$data/models/gigaam-v3-ctc") }
           if (Test-Path "$data/tessdata/rus.traineddata") { $a += @("--tessdata", "$data/tessdata") }
           $p = Start-Process -FilePath artifacts/publish/JARVIS/JARVIS.exe -ArgumentList $a -PassThru -Wait
           Get-Content artifacts/selftest-report.txt

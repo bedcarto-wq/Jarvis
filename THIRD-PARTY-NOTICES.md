@@ -2,6 +2,8 @@
 
 | Компонент | Назначение | Лицензия | Как попадает в сборку |
 |---|---|---|---|
+| [GigaAM v3](https://github.com/salute-developers/GigaAM) (Сбер), ONNX-версия [csukuangfj/sherpa-onnx-nemo-ctc-giga-am-v3-russian](https://huggingface.co/csukuangfj/sherpa-onnx-nemo-ctc-giga-am-v3-russian-2025-12-16) | Модель распознавания русской речи, движок по умолчанию | MIT | Скачивается пользователем (`scripts/download-models.ps1`) |
+| [sherpa-onnx 1.13.8](https://github.com/k2-fsa/sherpa-onnx) (NuGet `org.k2fsa.sherpa.onnx`) с ONNX Runtime | Запуск модели GigaAM | Apache-2.0 / MIT (ONNX Runtime) | NuGet-пакет, `sherpa-onnx-c-api.dll`, `onnxruntime.dll` |
 | [Vosk API 0.3.38](https://github.com/alphacep/vosk-api) (NuGet `Vosk`) | Распознавание речи (Kaldi), движок по умолчанию | Apache-2.0 | NuGet-пакет, `libvosk.dll` рядом с программой |
 | [vosk-model-small-ru-0.22](https://alphacephei.com/vosk/models) | Лёгкая модель распознавания русской речи (~45 МБ) | Apache-2.0 | Скачивается пользователем (`scripts/download-models.ps1`), в репозитории не хранится |
 | [PocketSphinx 5.0.4](https://github.com/cmusphinx/pocketsphinx) (CMU Sphinx) | Распознавание речи (GMM-HMM, не нейросеть) | BSD-2-Clause | Собирается из исходников в CI (`scripts/build-pocketsphinx.ps1`), `pocketsphinx.dll` |

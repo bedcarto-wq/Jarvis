@@ -54,12 +54,14 @@ public class VoskTests
     }
 
     [Fact]
-    public void Settings_OldPocketSphinxDefault_MigratesToVosk_Once()
+    public void Settings_OldDefaults_MigrateToGigaAm_Once()
     {
         var old = new JarvisSettings { SpeechEngine = SpeechEngineKind.PocketSphinx, SpeechEngineRevision = null }.Normalize();
-        Assert.Equal(SpeechEngineKind.Vosk, old.SpeechEngine);
-        var chosen = new JarvisSettings { SpeechEngine = SpeechEngineKind.PocketSphinx, SpeechEngineRevision = 2 }.Normalize();
-        Assert.Equal(SpeechEngineKind.PocketSphinx, chosen.SpeechEngine);
+        Assert.Equal(SpeechEngineKind.GigaAm, old.SpeechEngine);
+        var vosk = new JarvisSettings { SpeechEngine = SpeechEngineKind.Vosk, SpeechEngineRevision = 2 }.Normalize();
+        Assert.Equal(SpeechEngineKind.GigaAm, vosk.SpeechEngine);
+        var chosen = new JarvisSettings { SpeechEngine = SpeechEngineKind.Vosk, SpeechEngineRevision = 3 }.Normalize();
+        Assert.Equal(SpeechEngineKind.Vosk, chosen.SpeechEngine);
     }
 }
 
@@ -94,6 +96,56 @@ public class VoskIntegrationTests
             // Пустой *.txt — посторонний разговор: в нём не должно появиться фразы активации.
             if (expected.Length == 0) Assert.True(r is null || !r.Text.Contains("джарвис"), r?.Text);
             else Assert.Equal(expected, r?.Text);
+        }
+    }
+}
+
+public class GigaAmTests
+{
+    [Fact]
+    public void Snap_FixesNearMisses_KeepsUnrelatedWords()
+    {
+        var vocab = new HashSet<string> { "джарвис", "открой", "браузер", "телеграм", "громкость" };
+        Assert.Equal("джарвис открой браузер", GigaAmEngine.SnapToVocabulary("джарвиз открои браузер", vocab, 0.5));
+        Assert.Equal("погода сегодня", GigaAmEngine.SnapToVocabulary("погода сегодня", vocab, 0.5));
+        Assert.Equal("открой телеграм", GigaAmEngine.SnapToVocabulary("открой телеграмм", vocab, 0.5));
+    }
+
+    [Fact]
+    public void Levenshtein_Basic()
+    {
+        Assert.Equal(0, GigaAmEngine.Levenshtein("кот", "кот"));
+        Assert.Equal(1, GigaAmEngine.Levenshtein("кот", "кит"));
+        Assert.Equal(3, GigaAmEngine.Levenshtein("", "кот"));
+    }
+
+    [Fact]
+    public void ValidateModel_ReportsMissingFolder() =>
+        Assert.NotNull(GigaAmEngine.ValidateModel(Path.Combine(Path.GetTempPath(), "нет-gigaam-" + Guid.NewGuid())));
+
+    /// <summary>Выполняется, если задана JARVIS_GIGAAM_MODEL; с JARVIS_VOSK_SAMPLES проверяет и записи.</summary>
+    [Fact]
+    public void RealModel_RecognizesSamples()
+    {
+        var model = Environment.GetEnvironmentVariable("JARVIS_GIGAAM_MODEL");
+        if (string.IsNullOrEmpty(model) || !Directory.Exists(model)) return;
+        using var engine = new GigaAmEngine(model);
+        engine.Initialize(VocabularyBuilder.Build(new JarvisSettings(), BuiltInApps.All.Select(BuiltInApps.ToEntry), ["рабочий режим"]));
+        Assert.True(engine.IsReady, engine.Status);
+        Assert.Null(engine.Recognize(new short[16000]));
+        var samples = Environment.GetEnvironmentVariable("JARVIS_VOSK_SAMPLES");
+        if (string.IsNullOrEmpty(samples) || !Directory.Exists(samples)) return;
+        foreach (var raw in Directory.GetFiles(samples, "*.raw"))
+        {
+            var txt = Path.ChangeExtension(raw, ".txt");
+            if (!File.Exists(txt)) continue;
+            var expected = File.ReadAllText(txt).Trim();
+            if (expected.Length == 0) continue;
+            var bytes = File.ReadAllBytes(raw);
+            var pcm = new short[bytes.Length / 2];
+            Buffer.BlockCopy(bytes, 0, pcm, 0, pcm.Length * 2);
+            var r = engine.Recognize(pcm);
+            Assert.True(r is not null && r.Text.Contains(expected.Split(' ')[0]), $"{expected} → {r?.Text}");
         }
     }
 }

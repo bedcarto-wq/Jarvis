@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Jarvis.Core.Logging;
 using Jarvis.Core.Text;
-using Vosk;
 
 namespace Jarvis.Voice.Recognition;
 
@@ -20,8 +19,8 @@ public sealed class VoskEngine : ISpeechEngine
     private readonly string _modelDir;
     private readonly IJarvisLog _log;
     private readonly object _sync = new();
-    private Model? _model;
-    private VoskRecognizer? _rec;
+    private IntPtr _model;
+    private IntPtr _rec;
     /// <summary>Вариант слова для модели → исходное слово (например, «жопа» → «жёпа»).</summary>
     private Dictionary<string, string> _aliases = new(StringComparer.Ordinal);
 
@@ -32,7 +31,7 @@ public sealed class VoskEngine : ISpeechEngine
     }
 
     public string Name => "Vosk (small-ru, офлайн)";
-    public bool IsReady => _rec is not null;
+    public bool IsReady => _rec != IntPtr.Zero;
     public string Status { get; private set; } = "Не инициализирован";
 
     /// <summary>Строгость 0..1: минимальная средняя уверенность слов фразы.</summary>
@@ -59,13 +58,18 @@ public sealed class VoskEngine : ISpeechEngine
             if (problem is not null) { Status = problem; throw new InvalidOperationException(problem); }
             try
             {
-                Vosk.Vosk.SetLogLevel(-1);
-                _model = new Model(_modelDir);
+                VoskNative.SetLogLevel(-1);
+                _model = VoskNative.ModelNew(NativePath.Safe(_modelDir));
             }
             catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
             {
                 Status = "Не найдена библиотека libvosk.dll рядом с программой";
                 throw new InvalidOperationException(Status, ex);
+            }
+            if (_model == IntPtr.Zero)
+            {
+                Status = $"Vosk не смог загрузить модель из {_modelDir}";
+                throw new InvalidOperationException(Status);
             }
             ApplyGrammar(grammar);
             _log.Info($"Vosk: {Status}");
@@ -76,7 +80,7 @@ public sealed class VoskEngine : ISpeechEngine
     {
         lock (_sync)
         {
-            if (_model is null) { Initialize(grammar); return; }
+            if (_model == IntPtr.Zero) { Initialize(grammar); return; }
             ApplyGrammar(grammar);
         }
     }
@@ -85,11 +89,12 @@ public sealed class VoskEngine : ISpeechEngine
     {
         var (phrases, aliases) = BuildPhrases(grammar);
         _aliases = aliases;
-        _rec?.Dispose();
+        if (_rec != IntPtr.Zero) { VoskNative.RecognizerFree(_rec); _rec = IntPtr.Zero; }
         _rec = UseGrammar
-            ? new VoskRecognizer(_model!, SampleRate, JsonSerializer.Serialize(phrases, GrammarJson))
-            : new VoskRecognizer(_model!, SampleRate);
-        _rec.SetWords(true);
+            ? VoskNative.RecognizerNewGrm(_model, SampleRate, JsonSerializer.Serialize(phrases, GrammarJson))
+            : VoskNative.RecognizerNew(_model, SampleRate);
+        if (_rec == IntPtr.Zero) { Status = "Vosk не смог создать распознаватель"; throw new InvalidOperationException(Status); }
+        VoskNative.RecognizerSetWords(_rec, 1);
         Status = UseGrammar ? $"Готов: {phrases.Count - 1} фраз в словаре команд" : "Готов: свободное распознавание";
     }
 
@@ -129,13 +134,13 @@ public sealed class VoskEngine : ISpeechEngine
         }
     }
 
-    public RecognitionResult? Recognize(short[] samples)
+    public unsafe RecognitionResult? Recognize(short[] samples)
     {
         lock (_sync)
         {
-            if (_rec is null || samples.Length == 0) return null;
-            _rec.AcceptWaveform(samples, samples.Length);
-            var json = _rec.FinalResult();
+            if (_rec == IntPtr.Zero || samples.Length == 0) return null;
+            fixed (short* p = samples) VoskNative.RecognizerAcceptWaveformS(_rec, p, samples.Length);
+            var json = VoskNative.PtrToUtf8(VoskNative.RecognizerFinalResult(_rec));
             var (text, confidence) = Parse(json, _aliases);
             _log.Debug($"Vosk: «{text}», p={confidence:F2}");
             if (text.Length == 0) return null;
@@ -177,8 +182,8 @@ public sealed class VoskEngine : ISpeechEngine
 
     private void DisposeAll()
     {
-        _rec?.Dispose(); _rec = null;
-        _model?.Dispose(); _model = null;
+        if (_rec != IntPtr.Zero) { VoskNative.RecognizerFree(_rec); _rec = IntPtr.Zero; }
+        if (_model != IntPtr.Zero) { VoskNative.ModelFree(_model); _model = IntPtr.Zero; }
     }
 
     public void Dispose()

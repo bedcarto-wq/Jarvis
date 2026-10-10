@@ -16,6 +16,8 @@ public enum StopReaction
 
 public enum SpeechEngineKind
 {
+    /// <summary>GigaAM v3 (Сбер, MIT) через sherpa-onnx: свободная речь, лучшая точность для русского, ~225 МБ.</summary>
+    GigaAm,
     /// <summary>Vosk (Kaldi) с лёгкой моделью vosk-model-small-ru (~45 МБ), офлайн, ограниченный словарь команд.</summary>
     Vosk,
     /// <summary>CMU PocketSphinx (классическая HMM/GMM-модель), офлайн, русский язык.</summary>
@@ -57,7 +59,7 @@ public sealed class JarvisSettings
     public bool DebugMode { get; set; }
 
     // Голос
-    public SpeechEngineKind SpeechEngine { get; set; } = SpeechEngineKind.Vosk;
+    public SpeechEngineKind SpeechEngine { get; set; } = SpeechEngineKind.GigaAm;
     /// <summary>Версия выбора движка: старые настройки с PocketSphinx по умолчанию один раз переводятся на Vosk.</summary>
     public int? SpeechEngineRevision { get; set; }
     public bool VoiceActivationEnabled { get; set; } = true;
@@ -77,6 +79,7 @@ public sealed class JarvisSettings
     public double RecognitionStrictness { get; set; } = 0.5;
     public string? PocketSphinxModelPath { get; set; }
     public string? VoskModelPath { get; set; }
+    public string? GigaAmModelPath { get; set; }
     public string SapiCulture { get; set; } = "ru-RU";
     public bool BeepOnListen { get; set; } = true;
     public bool BeepOnDone { get; set; } = true;
@@ -145,10 +148,11 @@ public sealed class JarvisSettings
         TtsRate = Math.Clamp(TtsRate, -10, 10);
         TtsVolume = Math.Clamp(TtsVolume, 0, 100);
         HudOpacity = Math.Clamp(HudOpacity, 0.3, 1.0);
-        if (SpeechEngineRevision is null or < 2)
+        if (SpeechEngineRevision is null or < 3)
         {
-            if (SpeechEngine == SpeechEngineKind.PocketSphinx) SpeechEngine = SpeechEngineKind.Vosk;
-            SpeechEngineRevision = 2;
+            // Один раз переводим прежние движки по умолчанию на GigaAM; дальше выбор пользователя сохраняется.
+            if (SpeechEngine is SpeechEngineKind.PocketSphinx or SpeechEngineKind.Vosk) SpeechEngine = SpeechEngineKind.GigaAm;
+            SpeechEngineRevision = 3;
         }
         DangerousOperations ??= DefaultDangerous();
         foreach (var c in Enum.GetValues<DangerCategory>().Where(c => c != DangerCategory.None))
